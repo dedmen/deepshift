@@ -1,21 +1,34 @@
 // DeepShift OpenChamber service.
 //
-// Answers the Work Status section (`contributes.statusSection.source`) the app
-// polls while the section is on screen: the current peak/off-peak state with a
-// status dot, the next transition, the run-now advice, and the stale-calendar
-// warning. Everything is a pure function of the clock and the bundled
-// schedule, so the service holds no state: the host may stop it after ten
-// quiet minutes and the next poll starts it fresh.
+// Two jobs:
 //
-// Built by `npm run build:openchamber` into service/main.js (one CJS file; the
-// host runs it directly and node_modules does not ship).
+//  - `GET /status` answers the Work Status section (`contributes.statusSection
+//    .source`) the app polls while the section is on screen: state dot, next
+//    transition, run-now advice, stale-calendar warning.
+//  - It puts one sidebar mark on the session in front while that session's
+//    model is a paid DeepSeek one, turning amber 10 minutes before a
+//    transition — the app has no extension-sent notification, so this is the
+//    always-visible alert.
+//
+// Everything is derived from the clock and the bundled schedule; the only
+// state is which mark is currently set, and it is re-derived on every check so
+// a restarted process converges.
 
-import http from 'node:http';
+import * as http from 'node:http';
+import { createServiceHost } from '@openchamber/sdk';
+import type { GuestStatusRow, GuestStatusView, GuestTone } from '@openchamber/sdk';
 import { fmtTime, formatCountdown, getState, holidayCoverageYears } from '../../src/schedule';
+import type { TimeState } from '../../src/schedule';
 import { adviceText, dayTag, pillLabel } from '../../src/view-model';
-import type { GuestStatusRow, GuestStatusView } from '@openchamber/sdk';
+import { isPricedDeepSeek, readCurrentSession } from './session-state';
 
 const token = process.env.OPENCHAMBER_SERVICE_TOKEN ?? '';
+// Pre-transition alert, matching the other clients' default.
+const ALERT_BEFORE_MINUTES = 10;
+// How often the sidebar mark is re-derived; a transition wakes it sooner.
+const MARK_REFRESH_MS = 10_000;
+
+// ── Work Status section ──────────────────────────────────────────────────────
 
 const statusView = (): GuestStatusView => {
 	const now = new Date();
@@ -66,6 +79,75 @@ const statusView = (): GuestStatusView => {
 	return { rows };
 };
 
+// ── Sidebar mark ─────────────────────────────────────────────────────────────
+
+const host = createServiceHost({ env: process.env });
+
+type Mark = { icon: string; tone: GuestTone; text: string };
+
+const markFor = (s: TimeState): Mark => {
+	const cd = formatCountdown(s.minutesRemaining);
+	const soon = s.minutesRemaining <= ALERT_BEFORE_MINUTES;
+	if (!s.isOffPeak) {
+		return soon
+			? { icon: 'timer', tone: 'warning', text: `Peak ends in ${cd} — off-peak resuming soon` }
+			: { icon: 'timer', tone: 'error', text: `Peak pricing · 2x rates · off-peak in ${cd}` };
+	}
+	return soon
+		? { icon: 'timer', tone: 'warning', text: `Peak starts in ${cd} — finish large runs` }
+		: { icon: 'timer', tone: 'success', text: `Off-peak · 50% off · peak in ${cd}` };
+};
+
+let markedSession: string | null = null;
+let markedJson = '';
+let hostWarned = false;
+
+const clearMark = async () => {
+	const sessionId = markedSession;
+	if (!sessionId) return;
+	markedSession = null;
+	markedJson = '';
+	await host.setMark({ sessionId }, null);
+};
+
+/** Puts the mark on the session in front, or takes it off. Never throws. */
+const reconcileMark = async () => {
+	try {
+		const current = readCurrentSession();
+		if (!current || !isPricedDeepSeek(current.model)) {
+			await clearMark();
+			return;
+		}
+		const mark = markFor(getState());
+		const json = JSON.stringify(mark);
+		if (current.sessionId === markedSession && json === markedJson) return;
+		if (markedSession && markedSession !== current.sessionId) await clearMark();
+		await host.setMark({ sessionId: current.sessionId }, mark);
+		markedSession = current.sessionId;
+		markedJson = json;
+	} catch (error) {
+		// Not approved yet, a refused call, or an unreadable database: the
+		// status section must keep working without a mark.
+		if (!hostWarned) {
+			hostWarned = true;
+			console.warn(
+				'DeepShift: sidebar mark unavailable —',
+				error instanceof Error ? error.message : String(error)
+			);
+		}
+	}
+};
+
+/** Re-derives the mark every 10 s, and right after the next transition. */
+const scheduleMark = () => {
+	const wait = Math.min(Math.max(getState().transitionAt - Date.now() + 500, 1000), MARK_REFRESH_MS);
+	setTimeout(() => {
+		void reconcileMark().finally(scheduleMark);
+	}, wait);
+};
+
+// ── HTTP ─────────────────────────────────────────────────────────────────────
+
 const server = http.createServer((req, res) => {
 	// Every request carries the bearer, /health too.
 	if (req.headers.authorization !== `Bearer ${token}`) {
@@ -86,3 +168,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(Number(process.env.OPENCHAMBER_SERVICE_PORT), '127.0.0.1');
+void reconcileMark();
+scheduleMark();

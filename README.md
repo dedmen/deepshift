@@ -67,7 +67,10 @@ timezone, "Should I run now?" advice, the rate card, and copy/open actions. Same
 pre-transition toasts as the other clients. It also contributes a **DeepShift section to the
 chat's Work Status panel**: the app-drawn state row (red/green dot, `DS PEAK · 2h 48m`), the
 next transition and the run-now advice, polled from a small Node service — so the pricing state
-is visible without opening the panel. The panel and service are bundled by
+is visible without opening the panel. While the **session in front runs a paid DeepSeek model**,
+the service also puts a **mark on its sidebar row** (red during peak, green off-peak, amber in
+the 10 minutes before a transition, tooltip with the countdown; click opens the panel); free
+DeepSeek models and other providers show nothing. The panel and service are bundled by
 `npm run build:openchamber` (the host never compiles TypeScript), and the package ships the
 OpenCode plugin in `openchamber/plugin/`, so one install covers both clients.
 

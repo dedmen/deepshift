@@ -23,7 +23,200 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // openchamber/service/main.ts
-var import_node_http = __toESM(require("node:http"));
+var http = __toESM(require("node:http"));
+
+// node_modules/@openchamber/sdk/dist/scrollbar-style.js
+var GUEST_SCROLLING_ATTRIBUTE = "data-oc-scrolling";
+var GUEST_SCROLLBAR_CSS = `
+:root {
+  /* Quiet at rest like the app's own thumbs; hover gives a clear grab target. */
+  --oc-scrollbar-thumb: color-mix(in srgb, var(--oc-muted, currentColor) 18%, transparent);
+  --oc-scrollbar-thumb-hover: color-mix(in srgb, var(--oc-muted, currentColor) 36%, transparent);
+  scrollbar-gutter: stable;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+:hover, [${GUEST_SCROLLING_ATTRIBUTE}] {
+  scrollbar-color: var(--oc-scrollbar-thumb) transparent;
+}
+/* Chromium's standard scrollbar properties otherwise override its pseudo-elements. */
+@supports selector(::-webkit-scrollbar) {
+  *, :hover, [${GUEST_SCROLLING_ATTRIBUTE}] { scrollbar-width: auto; scrollbar-color: auto; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 999px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+  :hover::-webkit-scrollbar-thumb, [${GUEST_SCROLLING_ATTRIBUTE}]::-webkit-scrollbar-thumb { background: var(--oc-scrollbar-thumb); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--oc-scrollbar-thumb-hover); }
+  ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+}
+@media (forced-colors: active) {
+  *, :hover, [${GUEST_SCROLLING_ATTRIBUTE}] { scrollbar-color: auto; }
+  ::-webkit-scrollbar-thumb, ::-webkit-scrollbar-thumb:hover { background: CanvasText; }
+}
+`;
+function installGuestScrollbarActivity(doc) {
+  const root = doc.documentElement;
+  if (root.hasAttribute("data-oc-scrollbar-activity"))
+    return;
+  root.setAttribute("data-oc-scrollbar-activity", "");
+  const timers = /* @__PURE__ */ new WeakMap();
+  doc.addEventListener("scroll", (event) => {
+    const target = event.target === doc ? root : event.target;
+    if (!(target instanceof Element))
+      return;
+    if (!target.hasAttribute("data-oc-scrolling"))
+      target.setAttribute("data-oc-scrolling", "");
+    const pending = timers.get(target);
+    if (pending !== void 0)
+      clearTimeout(pending);
+    timers.set(target, setTimeout(() => {
+      timers.delete(target);
+      target.removeAttribute("data-oc-scrolling");
+    }, 1e3));
+  }, { capture: true, passive: true });
+}
+var GUEST_SCROLLBAR_SCRIPT = `(${installGuestScrollbarActivity.toString()})(document);`;
+
+// node_modules/@openchamber/sdk/dist/manifest.js
+var GUEST_PROVIDER_LOGO_BYTES_MAX = 1024 * 1024;
+var TRACKER_URL_TOKENS = ["{id}", "{segment}", "{segments+}"];
+var TRACKER_URL_TOKEN_SET = new Set(TRACKER_URL_TOKENS);
+
+// node_modules/@openchamber/sdk/dist/session-events.js
+var GUEST_SESSION_EVENT_TYPES = [
+  "turn-finished",
+  "turn-failed",
+  "permission-asked",
+  "question-asked",
+  "turn-started",
+  "session-created",
+  "session-archived",
+  "session-deleted"
+];
+var SESSION_EVENTS_IDLE_MS = 10 * 6e4;
+var EVENT_TYPES = new Set(GUEST_SESSION_EVENT_TYPES);
+
+// node_modules/@openchamber/sdk/dist/service-host.js
+var SERVICE_HOST_PATH = "/service/call";
+var OPENCHAMBER_HOST_CALLBACK_URL_ENV = "OPENCHAMBER_HOST_CALLBACK_URL";
+var SERVICE_HOST_TIMEOUT_MS = 3e4;
+var SERVICE_SCHEDULE_IDLE_MS = 10 * 6e4;
+var MENTIONS_IDLE_MS = 10 * 6e4;
+var ServiceHostError = class extends Error {
+  code;
+  status;
+  constructor(message, code, status) {
+    super(message);
+    this.name = "ServiceHostError";
+    this.code = code;
+    this.status = status;
+  }
+};
+var createServiceHost = ({ env }) => {
+  const call = async (method, input) => {
+    const base = env[OPENCHAMBER_HOST_CALLBACK_URL_ENV];
+    const token2 = env.OPENCHAMBER_SERVICE_TOKEN;
+    if (!base || !token2)
+      throw new ServiceHostError("This service was not started by OpenChamber.", "HOST_UNAVAILABLE", 0);
+    let response;
+    try {
+      response = await fetch(`${base.replace(/\/+$/, "")}${SERVICE_HOST_PATH}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token2}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ method, input }),
+        signal: AbortSignal.timeout(SERVICE_HOST_TIMEOUT_MS)
+      });
+    } catch {
+      throw new ServiceHostError("OpenChamber did not answer.", "HOST_UNAVAILABLE", 0);
+    }
+    const body = await response.json().catch(() => null);
+    if (response.ok && body?.result !== void 0)
+      return body.result;
+    throw new ServiceHostError(body?.error?.message ?? `OpenChamber answered HTTP ${response.status}.`, body?.error?.code ?? "HOST_UNAVAILABLE", response.status);
+  };
+  return {
+    sessions: {
+      start: (input) => call("sessions.start", input),
+      send: (sessionId, prompt) => call("sessions.send", { sessionId, prompt }),
+      retry: (sessionId) => call("sessions.retry", { sessionId }),
+      status: (sessionId) => call("sessions.status", { sessionId }),
+      lastReply: (sessionId) => call("sessions.lastReply", { sessionId }),
+      stop: (sessionId) => call("sessions.stop", { sessionId }),
+      answerPermission: (sessionId, requestId, answer) => call("sessions.answerPermission", { sessionId, requestId, ...answer }),
+      answerForm: (sessionId, formId, values, message) => call("sessions.answerForm", { sessionId, formId, values, ...message === void 0 ? {} : { message } })
+    },
+    setInstructions: (directory, text) => call("instructions.set", { directory, text }),
+    emit: (topic, data) => call("panels.emit", { topic, data }),
+    readSettings: () => call("settings.read", {}).then(({ settings }) => settings),
+    needsConfiguration: (message) => call("status.set", { needsConfiguration: message }),
+    setMark: (target, mark) => call("marks.set", { target, mark })
+  };
+};
+
+// node_modules/@openchamber/sdk/dist/contract.js
+var GUEST_FILE_STAT_KINDS = ["file", "directory", "other", "missing"];
+var GUEST_GENERATE_LATE_KEEP_MS = 60 * 6e4;
+var HOST_REQUEST_ERROR_CODES = [
+  "HOST_UNAVAILABLE",
+  "HOST_TIMEOUT",
+  "HOST_REJECTED",
+  "DISCONNECTED",
+  "DISABLED",
+  "BAD_PATH",
+  "NO_INTEGRATION",
+  "NO_SERVICE",
+  "SERVICE_FAILED",
+  "REQUEST_FAILED",
+  "RESPONSE_TOO_LARGE",
+  "NO_SESSION",
+  "SESSION_BUSY",
+  "NOT_GRANTED",
+  "NO_DIRECTORY",
+  "NOT_FOUND",
+  "FILE_TOO_LARGE",
+  "DENIED",
+  "NO_MODEL",
+  "MODEL_FAILED",
+  "UNSUPPORTED"
+];
+var SERVICE_STATUS_VALUES = ["stopped", "starting", "ready", "failed"];
+var hostRequestErrorCodeSet = new Set(HOST_REQUEST_ERROR_CODES);
+var serviceStatusSet = new Set(SERVICE_STATUS_VALUES);
+var fileStatKindSet = new Set(GUEST_FILE_STAT_KINDS);
+
+// node_modules/@openchamber/sdk/dist/service-providers.js
+var BROWSER_CONTROL_ACTIONS = [
+  "browser.open",
+  "browser.snapshot",
+  "browser.click",
+  "browser.type",
+  "browser.select",
+  "browser.scroll",
+  "browser.back",
+  "browser.forward",
+  "browser.inspect",
+  "browser.capture",
+  "browser.resize",
+  "browser.close"
+];
+var BROWSER_PROVIDER_IDLE_MS = 10 * 6e4;
+var CONTROL_ACTIONS = new Set(BROWSER_CONTROL_ACTIONS);
+var SOURCE_CONTROL_PROVIDER_IDLE_MS = 10 * 6e4;
+var NOTIFICATIONS_PROVIDER_IDLE_MS = 10 * 6e4;
+var TRACKER_PROVIDER_IDLE_MS = 10 * 6e4;
+var QUOTA_PROVIDER_IDLE_MS = 10 * 6e4;
+
+// node_modules/@openchamber/sdk/dist/service-surface.js
+var SURFACE_CONTROLLERS = ["none", "agent", "user"];
+var CONTROLLERS = new Set(SURFACE_CONTROLLERS);
 
 // src/schedule.ts
 var deepSeekV4 = {
@@ -262,8 +455,68 @@ function dayTag(at, now) {
   return new Date(at).toLocaleDateString([], { weekday: "short" });
 }
 
+// openchamber/service/session-state.ts
+var import_node_os = require("node:os");
+var import_node_path = require("node:path");
+var opencodeDatabasePath = (env = process.env) => {
+  const dataDir = env.OPENCODE_DATA_DIR ?? (0, import_node_path.join)(env.XDG_DATA_HOME ?? (0, import_node_path.join)((0, import_node_os.homedir)(), ".local", "share"), "opencode");
+  return (0, import_node_path.join)(dataDir, "opencode.db");
+};
+var loadSqlite = () => {
+  try {
+    return require("node:sqlite");
+  } catch {
+    return null;
+  }
+};
+var parseSessionModel = (raw) => {
+  if (typeof raw !== "string" || raw.length === 0) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    const id = typeof parsed.id === "string" ? parsed.id : "";
+    const provider = typeof parsed.providerID === "string" ? parsed.providerID : "";
+    return id ? { provider, id } : null;
+  } catch {
+    return null;
+  }
+};
+var isPricedDeepSeek = (model) => {
+  if (!model) return false;
+  return /deepseek/i.test(model.id) && !/-free$/i.test(model.id);
+};
+var readCurrentSession = (dbPath = opencodeDatabasePath()) => {
+  const sqlite = loadSqlite();
+  if (!sqlite) return null;
+  let db = null;
+  try {
+    db = new sqlite.DatabaseSync(dbPath, { readOnly: true });
+    const row = db.prepare(
+      `select id, directory, model
+				 from session_v2
+				 where parent_id is null and (time_archived is null or time_archived = 0)
+				 order by max(coalesce(time_viewed, 0), time_updated) desc
+				 limit 1`
+    ).all()[0];
+    if (!row || typeof row.id !== "string") return null;
+    return {
+      sessionId: row.id,
+      directory: typeof row.directory === "string" ? row.directory : null,
+      model: parseSessionModel(row.model)
+    };
+  } catch {
+    return null;
+  } finally {
+    try {
+      db?.close();
+    } catch {
+    }
+  }
+};
+
 // openchamber/service/main.ts
 var token = process.env.OPENCHAMBER_SERVICE_TOKEN ?? "";
+var ALERT_BEFORE_MINUTES = 10;
+var MARK_REFRESH_MS = 1e4;
 var statusView = () => {
   const now = /* @__PURE__ */ new Date();
   const s = getState(now);
@@ -306,7 +559,56 @@ var statusView = () => {
   }
   return { rows };
 };
-var server = import_node_http.default.createServer((req, res) => {
+var host = createServiceHost({ env: process.env });
+var markFor = (s) => {
+  const cd = formatCountdown(s.minutesRemaining);
+  const soon = s.minutesRemaining <= ALERT_BEFORE_MINUTES;
+  if (!s.isOffPeak) {
+    return soon ? { icon: "timer", tone: "warning", text: `Peak ends in ${cd} \u2014 off-peak resuming soon` } : { icon: "timer", tone: "error", text: `Peak pricing \xB7 2x rates \xB7 off-peak in ${cd}` };
+  }
+  return soon ? { icon: "timer", tone: "warning", text: `Peak starts in ${cd} \u2014 finish large runs` } : { icon: "timer", tone: "success", text: `Off-peak \xB7 50% off \xB7 peak in ${cd}` };
+};
+var markedSession = null;
+var markedJson = "";
+var hostWarned = false;
+var clearMark = async () => {
+  const sessionId = markedSession;
+  if (!sessionId) return;
+  markedSession = null;
+  markedJson = "";
+  await host.setMark({ sessionId }, null);
+};
+var reconcileMark = async () => {
+  try {
+    const current = readCurrentSession();
+    if (!current || !isPricedDeepSeek(current.model)) {
+      await clearMark();
+      return;
+    }
+    const mark = markFor(getState());
+    const json = JSON.stringify(mark);
+    if (current.sessionId === markedSession && json === markedJson) return;
+    if (markedSession && markedSession !== current.sessionId) await clearMark();
+    await host.setMark({ sessionId: current.sessionId }, mark);
+    markedSession = current.sessionId;
+    markedJson = json;
+  } catch (error) {
+    if (!hostWarned) {
+      hostWarned = true;
+      console.warn(
+        "DeepShift: sidebar mark unavailable \u2014",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
+};
+var scheduleMark = () => {
+  const wait = Math.min(Math.max(getState().transitionAt - Date.now() + 500, 1e3), MARK_REFRESH_MS);
+  setTimeout(() => {
+    void reconcileMark().finally(scheduleMark);
+  }, wait);
+};
+var server = http.createServer((req, res) => {
   if (req.headers.authorization !== `Bearer ${token}`) {
     res.writeHead(401).end();
     return;
@@ -323,3 +625,5 @@ var server = import_node_http.default.createServer((req, res) => {
   res.writeHead(404).end("{}");
 });
 server.listen(Number(process.env.OPENCHAMBER_SERVICE_PORT), "127.0.0.1");
+void reconcileMark();
+scheduleMark();

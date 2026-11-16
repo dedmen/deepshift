@@ -6,7 +6,7 @@
 	"openchamber": {
 		"apiVersion": 1,
 		"engines": {
-			"openchamber": ">=1.24.0"
+			"openchamber": ">=2.7.1"
 		},
 		"id": "deepshift",
 		"name": "DeepShift",
@@ -20,8 +20,10 @@
 			"opencodePlugin": "plugin",
 			"service": {
 				"entry": "service/main.js",
-				"runtime": "host"
+				"runtime": "host",
+				"keepRunning": true
 			},
+			"marks": true,
 			"statusSection": {
 				"source": {
 					"path": "/status",
