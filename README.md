@@ -58,12 +58,23 @@ The same engine also ships as an OpenCode Desktop plugin in [`opencode/`](openco
 a red bar and a composer pill with the live countdown, `/deepshift`, and the same 10-minute alerts.
 See [`opencode/README.md`](opencode/README.md) for the local install and options.
 
+### OpenChamber
+
+Also an OpenChamber extension in [`openchamber/`](openchamber/): a rail panel (also openable as a
+full page) with the same picture — hero countdown (`DS PEAK` / `DS OFF`, or `DS FREE` when the
+session runs a free DeepSeek model), Next/Then, best off-peak window, today's schedule in your
+timezone, "Should I run now?" advice, the rate card, and copy/open actions. Same 10-minute
+pre-transition toasts as the other clients. The panel is bundled into a single IIFE by
+`npm run build:openchamber` (the host never compiles TypeScript), and the package ships the
+OpenCode plugin in `openchamber/plugin/`, so one install covers both clients.
+
 ## Develop
 
 ```sh
 npm install
 npm test      # tsc + unit tests (weekday, weekend, holiday, timezone-boundary, price card)
 npm run watch # tsc -watch
+npm run build:openchamber # bundle the OpenChamber panel + plugin
 # F5 to launch Extension Development Host
 npx vsce package
 ```

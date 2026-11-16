@@ -2,7 +2,7 @@
 	"name": "deepshift",
 	"displayName": "DeepShift — DeepSeek Peak/Off-Peak Timer",
 	"description": "DeepSeek peak/off-peak countdown (09:00-12:00 & 14:00-18:00 Beijing, weekends and Chinese public holidays off-peak). Status bar + panel with local/Beijing times, per-model rate card and verification date.",
-	"version": "0.3.1",
+	"version": "0.4.0",
 	"publisher": "AsimAliPeerzada",
 	"license": "MIT",
 	"icon": "icon.png",
@@ -10,18 +10,39 @@
 		"type": "git",
 		"url": "https://github.com/asim-ali-peerzada/deepshift"
 	},
-	"keywords": ["deepseek", "pricing", "off-peak", "timer", "peak", "cost", "vscode"],
+	"keywords": [
+		"deepseek",
+		"pricing",
+		"off-peak",
+		"timer",
+		"peak",
+		"cost",
+		"vscode"
+	],
 	"engines": {
 		"vscode": "^1.80.0"
 	},
-	"categories": ["Other"],
-	"activationEvents": ["onStartupFinished"],
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+		"onStartupFinished"
+	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
-			{ "command": "deepshift.openPanel", "title": "DeepShift: Open Panel" },
-			{ "command": "deepshift.copyStatus", "title": "DeepShift: Copy Status" },
-			{ "command": "deepshift.diagnostics", "title": "DeepShift: Diagnose Timezone" }
+			{
+				"command": "deepshift.openPanel",
+				"title": "DeepShift: Open Panel"
+			},
+			{
+				"command": "deepshift.copyStatus",
+				"title": "DeepShift: Copy Status"
+			},
+			{
+				"command": "deepshift.diagnostics",
+				"title": "DeepShift: Diagnose Timezone"
+			}
 		],
 		"configuration": {
 			"title": "DeepShift",
@@ -46,11 +67,14 @@
 		"watch": "tsc -watch -p ./",
 		"test": "tsc -p ./ && node out/schedule.test.js && node out/view-model.test.js",
 		"vscode:prepublish": "tsc -p ./",
-		"build:opencode": "node opencode/build-opencode.mjs"
+		"build:opencode": "node opencode/build-opencode.mjs",
+		"build:openchamber": "node openchamber/build.mjs"
 	},
 	"devDependencies": {
+		"@openchamber/sdk": "^2.7.2",
 		"@types/node": "^20.0.0",
 		"@types/vscode": "^1.80.0",
+		"esbuild": "^0.28.2",
 		"typescript": "^5.4.0"
 	}
 }

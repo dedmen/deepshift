@@ -2,6 +2,23 @@
 
 All notable changes to DeepShift are documented here. Format follows Keep a Changelog and Semantic Versioning.
 
+## [0.4.0] - 2026-11-16
+
+### Added
+- **OpenChamber extension** (`openchamber/`): a rail panel, also openable as a full page, showing
+  the same DeepShift picture as the other clients — hero countdown (`DS PEAK` / `DS OFF`, or
+  `DS FREE` when the session runs a free DeepSeek model), Next/Then, best off-peak window,
+  today's schedule in the user's timezone, "Should I run now?" advice, the stale-calendar
+  warning, the per-model rate card, copy/open actions and diagnostics. It reuses
+  `src/schedule.ts` and `src/view-model.ts` and keeps the same 10-minute pre-transition
+  toasts. The panel is esbuild-bundled into a single IIFE (the OpenChamber host never compiles
+  TypeScript), and the extension package ships the OpenCode plugin in `openchamber/plugin/`,
+  so one install covers both clients.
+
+### Changed
+- `src/view-model.ts`: `shortHour()` and `dayTag()` are now exported so the OpenChamber panel
+  reuses them instead of re-implementing the formatting.
+
 ## [0.3.1] - 2026-10-02
 
 Internal code quality pass — no behaviour changes, no data changes.

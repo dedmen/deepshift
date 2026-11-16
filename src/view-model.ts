@@ -14,9 +14,9 @@ import {
 import type { TimeState } from './schedule';
 
 /**
- * UI-agnostic view model shared by the VS Code extension and the OpenCode
- * adapters. Nothing here imports `vscode` or DOM APIs: each adapter maps the
- * plain strings and rows below to its own UI.
+ * UI-agnostic view model shared by the VS Code extension, the OpenCode plugin
+ * and the OpenChamber panel. Nothing here imports `vscode` or DOM APIs: each
+ * adapter maps the plain strings and rows below to its own UI.
  *
  * All pricing, schedule and holiday data comes from `schedule.ts`. Do not add
  * copies of that data here.
@@ -137,14 +137,16 @@ export function diagnosticsText(now: Date = new Date()): string {
 	].join('\n');
 }
 
-function shortHour(epoch: number): string {
+/** "06" or "06:30" — a local hour without a day, for schedule rows. */
+export function shortHour(epoch: number): string {
 	const d = new Date(epoch);
 	const h = d.getHours();
 	const m = d.getMinutes();
 	return m === 0 ? String(h).padStart(2, '0') : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function dayTag(at: number, now: Date): string {
+/** "today" / "tomorrow" / "Mon" — a short day label for a timestamp. */
+export function dayTag(at: number, now: Date): string {
 	const today = now.toDateString();
 	const e = new Date(at).toDateString();
 	if (e === today) return 'today';
