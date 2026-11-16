@@ -4,6 +4,8 @@
 //
 //   panel/main.js  — esbuild IIFE bundle of panel/main.ts (the panel page plus
 //                    @openchamber/sdk and the shared src/ modules inlined)
+//   service/main.js — esbuild CJS bundle of service/main.ts (the Work Status
+//                    section's status endpoint; the host runs it directly)
 //   plugin/gui.cjs — the OpenCode GUI half, built by opencode/build-opencode.mjs
 //                    and copied in so one OpenChamber install also registers
 //                    the DeepShift OpenCode plugin
@@ -37,4 +39,16 @@ await build({
 	logLevel: 'silent',
 });
 
-console.log('openchamber/panel/main.js  +  openchamber/plugin/gui.cjs  built');
+// 3. The Work Status service, one CJS file the host node runs directly.
+await build({
+	entryPoints: [join(here, 'service/main.ts')],
+	outfile: join(here, 'service/main.js'),
+	bundle: true,
+	format: 'cjs',
+	platform: 'node',
+	target: 'node18',
+	sourcemap: false,
+	logLevel: 'silent',
+});
+
+console.log('openchamber/panel/main.js  +  service/main.js  +  plugin/gui.cjs  built');

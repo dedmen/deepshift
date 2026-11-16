@@ -14,6 +14,12 @@ All notable changes to DeepShift are documented here. Format follows Keep a Chan
   toasts. The panel is esbuild-bundled into a single IIFE (the OpenChamber host never compiles
   TypeScript), and the extension package ships the OpenCode plugin in `openchamber/plugin/`,
   so one install covers both clients.
+- **DeepShift section in the chat's Work Status panel** (`contributes.statusSection` +
+  `contributes.service`): the pricing state is no longer hidden behind the rail panel. The app
+  draws a status row (red dot + `DS PEAK · 2h 48m` / green dot + `DS OFF · …`), the next
+  transition and the run-now advice, polling `GET /status` on a small Node service (bundled to
+  `openchamber/service/main.js`) every 10 s while the section is on screen. The answer is
+  validated against the SDK's `guestStatusViewSchema`.
 
 ### Changed
 - `src/view-model.ts`: `shortHour()` and `dayTag()` are now exported so the OpenChamber panel

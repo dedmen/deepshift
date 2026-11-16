@@ -17,7 +17,18 @@
 				"mobile": true
 			},
 			"page": true,
-			"opencodePlugin": "plugin"
+			"opencodePlugin": "plugin",
+			"service": {
+				"entry": "service/main.js",
+				"runtime": "host"
+			},
+			"statusSection": {
+				"source": {
+					"path": "/status",
+					"interval": 10000
+				},
+				"title": "DeepShift"
+			}
 		}
 	},
 	"dependencies": {

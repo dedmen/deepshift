@@ -64,7 +64,10 @@ Also an OpenChamber extension in [`openchamber/`](openchamber/): a rail panel (a
 full page) with the same picture — hero countdown (`DS PEAK` / `DS OFF`, or `DS FREE` when the
 session runs a free DeepSeek model), Next/Then, best off-peak window, today's schedule in your
 timezone, "Should I run now?" advice, the rate card, and copy/open actions. Same 10-minute
-pre-transition toasts as the other clients. The panel is bundled into a single IIFE by
+pre-transition toasts as the other clients. It also contributes a **DeepShift section to the
+chat's Work Status panel**: the app-drawn state row (red/green dot, `DS PEAK · 2h 48m`), the
+next transition and the run-now advice, polled from a small Node service — so the pricing state
+is visible without opening the panel. The panel and service are bundled by
 `npm run build:openchamber` (the host never compiles TypeScript), and the package ships the
 OpenCode plugin in `openchamber/plugin/`, so one install covers both clients.
 
