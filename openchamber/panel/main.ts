@@ -80,6 +80,7 @@ const CSS = `
 .ds-model-name { font-family: var(--oc-mono, monospace); font-size: 0.9em; }
 .ds-model-name .ds-ver { color: var(--oc-muted, gray); font-family: var(--oc-font, inherit); font-size: 0.85em; margin-left: 6px; }
 
+.ds-note { font-size: 0.8em; color: var(--oc-muted, gray); padding: 4px 0 2px; }
 .ds-verified { font-size: 0.8em; color: var(--oc-muted, gray); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ds-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -179,11 +180,13 @@ for (const m of deepSeekV4.models) {
 	];
 	for (const [k, v] of lanes) {
 		const r = row(k);
+		r.value.textContent = v;
 		r.value.classList.add('mono');
 		block.append(r.root);
 	}
 	pricing.append(block);
 }
+pricing.append(el('div', 'ds-note', deepSeekV4.note));
 
 // ── Host wiring ──────────────────────────────────────────────────────────────
 

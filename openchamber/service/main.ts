@@ -6,9 +6,9 @@
 //    .source`) the app polls while the section is on screen: state dot, next
 //    transition, run-now advice, stale-calendar warning.
 //  - It puts one sidebar mark on the session in front while that session's
-//    model is a paid DeepSeek one, turning amber 10 minutes before a
-//    transition — the app has no extension-sent notification, so this is the
-//    always-visible alert.
+//    model is a DeepSeek one (paid or free), turning amber 10 minutes before
+//    a transition on a paid model — the app has no extension-sent
+//    notification, so this is the always-visible alert.
 //
 // Everything is derived from the clock and the bundled schedule; the only
 // state is which mark is currently set, and it is re-derived on every check so
@@ -20,7 +20,7 @@ import type { GuestStatusRow, GuestStatusView, GuestTone } from '@openchamber/sd
 import { fmtTime, formatCountdown, getState, holidayCoverageYears } from '../../src/schedule';
 import type { TimeState } from '../../src/schedule';
 import { adviceText, dayTag, pillLabel } from '../../src/view-model';
-import { isPricedDeepSeek, readCurrentSession } from './session-state';
+import { isDeepSeek, isFreeDeepSeek, readCurrentSession } from './session-state';
 
 const token = process.env.OPENCHAMBER_SERVICE_TOKEN ?? '';
 // Pre-transition alert, matching the other clients' default.
@@ -85,9 +85,15 @@ const host = createServiceHost({ env: process.env });
 
 type Mark = { icon: string; tone: GuestTone; text: string };
 
-const markFor = (s: TimeState): Mark => {
+const markFor = (s: TimeState, free: boolean): Mark => {
 	const cd = formatCountdown(s.minutesRemaining);
 	const soon = s.minutesRemaining <= ALERT_BEFORE_MINUTES;
+	if (free) {
+		// Nothing is charged either way, so no pricing language and no amber
+		// alert — just the clock, in a neutral tone.
+		const next = s.isOffPeak ? `peak in ${cd}` : `off-peak in ${cd}`;
+		return { icon: 'timer', tone: 'info', text: `Free DeepSeek model — no price change · ${next}` };
+	}
 	if (!s.isOffPeak) {
 		return soon
 			? { icon: 'timer', tone: 'warning', text: `Peak ends in ${cd} — off-peak resuming soon` }
@@ -114,11 +120,11 @@ const clearMark = async () => {
 const reconcileMark = async () => {
 	try {
 		const current = readCurrentSession();
-		if (!current || !isPricedDeepSeek(current.model)) {
+		if (!current || !isDeepSeek(current.model)) {
 			await clearMark();
 			return;
 		}
-		const mark = markFor(getState());
+		const mark = markFor(getState(), isFreeDeepSeek(current.model));
 		const json = JSON.stringify(mark);
 		if (current.sessionId === markedSession && json === markedJson) return;
 		if (markedSession && markedSession !== current.sessionId) await clearMark();

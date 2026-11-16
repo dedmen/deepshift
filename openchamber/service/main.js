@@ -480,9 +480,13 @@ var parseSessionModel = (raw) => {
     return null;
   }
 };
-var isPricedDeepSeek = (model) => {
+var isDeepSeek = (model) => {
   if (!model) return false;
-  return /deepseek/i.test(model.id) && !/-free$/i.test(model.id);
+  return /deepseek/i.test(model.id) || /deepseek/i.test(model.provider);
+};
+var isFreeDeepSeek = (model) => {
+  if (!model) return false;
+  return /deepseek/i.test(model.id) && /-free$/i.test(model.id);
 };
 var readCurrentSession = (dbPath = opencodeDatabasePath()) => {
   const sqlite = loadSqlite();
@@ -560,9 +564,13 @@ var statusView = () => {
   return { rows };
 };
 var host = createServiceHost({ env: process.env });
-var markFor = (s) => {
+var markFor = (s, free) => {
   const cd = formatCountdown(s.minutesRemaining);
   const soon = s.minutesRemaining <= ALERT_BEFORE_MINUTES;
+  if (free) {
+    const next = s.isOffPeak ? `peak in ${cd}` : `off-peak in ${cd}`;
+    return { icon: "timer", tone: "info", text: `Free DeepSeek model \u2014 no price change \xB7 ${next}` };
+  }
   if (!s.isOffPeak) {
     return soon ? { icon: "timer", tone: "warning", text: `Peak ends in ${cd} \u2014 off-peak resuming soon` } : { icon: "timer", tone: "error", text: `Peak pricing \xB7 2x rates \xB7 off-peak in ${cd}` };
   }
@@ -581,11 +589,11 @@ var clearMark = async () => {
 var reconcileMark = async () => {
   try {
     const current = readCurrentSession();
-    if (!current || !isPricedDeepSeek(current.model)) {
+    if (!current || !isDeepSeek(current.model)) {
       await clearMark();
       return;
     }
-    const mark = markFor(getState());
+    const mark = markFor(getState(), isFreeDeepSeek(current.model));
     const json = JSON.stringify(mark);
     if (current.sessionId === markedSession && json === markedJson) return;
     if (markedSession && markedSession !== current.sessionId) await clearMark();

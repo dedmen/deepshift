@@ -21,11 +21,12 @@ All notable changes to DeepShift are documented here. Format follows Keep a Chan
   `openchamber/service/main.js`) every 10 s while the section is on screen. The answer is
   validated against the SDK's `guestStatusViewSchema`.
 - **Sidebar mark on the session in front** (`contributes.marks`, `service.keepRunning`): while
-  the session's model is a paid DeepSeek one, its sidebar row carries a `timer` mark — red
-  during peak, green off-peak, and amber for the last 10 minutes before a transition, with the
-  countdown in the tooltip; a click opens the panel. The model comes from OpenCode's own
+  the session's model is a DeepSeek one — paid or free — its sidebar row carries a `timer` mark.
+  A paid model is red during peak, green off-peak, and amber for the last 10 minutes before a
+  transition, with the countdown in the tooltip; a free model shows a neutral "no price change"
+  mark instead. A click opens the panel. The model comes from OpenCode's own
   read-only `session_v2` row (`node:sqlite`), since OpenChamber hands a service no session
-  model. Free DeepSeek models and other providers get no mark. OpenChamber has no
+  model. Other providers get no mark. OpenChamber has no
   extension-sent desktop notification (its `notifications` role delivers *OpenChamber's*
   notifications to other channels), so the amber mark is the pre-transition alert.
   `engines.openchamber` is now `>=2.7.1`, the first host with marks.

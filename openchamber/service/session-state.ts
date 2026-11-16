@@ -61,12 +61,18 @@ export const parseSessionModel = (raw: unknown): SessionModel | null => {
 };
 
 /**
- * Only paid DeepSeek models are on the peak/off-peak clock; a `-free`
- * offering costs nothing either way, and other providers never see the price.
+ * Any DeepSeek model, paid or free: the sidebar mark shows on both, so the
+ * clock stays visible even when nothing is charged for the session.
  */
-export const isPricedDeepSeek = (model: SessionModel | null): boolean => {
+export const isDeepSeek = (model: SessionModel | null): boolean => {
 	if (!model) return false;
-	return /deepseek/i.test(model.id) && !/-free$/i.test(model.id);
+	return /deepseek/i.test(model.id) || /deepseek/i.test(model.provider);
+};
+
+/** A `-free` DeepSeek offering costs nothing; it still gets the mark. */
+export const isFreeDeepSeek = (model: SessionModel | null): boolean => {
+	if (!model) return false;
+	return /deepseek/i.test(model.id) && /-free$/i.test(model.id);
 };
 
 /**
